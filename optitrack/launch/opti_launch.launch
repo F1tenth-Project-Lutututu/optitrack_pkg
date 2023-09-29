@@ -1,0 +1,8 @@
+<launch>
+    <!-- <node name="optitrack_node" pkg="optitrack" type="optitrack" launch-prefix="gdbserver host:2345" output="screen"> -->
+    <node name="optitrack_node" pkg="optitrack" type="optitrack" output="screen">
+        <param name="nbodies" value="1"/>
+        <param name="local_address" value="192.168.1.175"/>
+        <param name="server_address" value="192.168.1.162"/>
+    </node>
+</launch>
