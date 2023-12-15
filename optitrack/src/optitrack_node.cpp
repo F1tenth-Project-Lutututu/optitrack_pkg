@@ -34,7 +34,6 @@ int main(int argc, char *argv[]) {
     std::vector<rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr> rbOdomPubs;
 
 
-
     rclcpp::init(argc, argv);
     auto node = rclcpp::Node::make_shared("optitrack");
     
@@ -65,9 +64,9 @@ int main(int argc, char *argv[]) {
     // vector<rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr> rbPubs;
     std::vector<uint> seqs;
     for(int r = 0; r < nbodies; ++r) {
-        rbPubs.push_back(node->create_publisher<geometry_msgs::msg::PoseStamped>("rigid_body_" + std::to_string(r), 10));
-        rbDebugPubs.push_back(node->create_publisher<optitrack_interfaces_msgs::msg::RigidBody>("rigid_body_debug_" + std::to_string(r), 10));
-        rbOdomPubs.push_back(node->create_publisher<nav_msgs::msg::Odometry>("odom", 10));
+        rbPubs.push_back(node->create_publisher<geometry_msgs::msg::PoseStamped>("optitrack/rigid_body_" + std::to_string(r), 10));
+        rbDebugPubs.push_back(node->create_publisher<optitrack_interfaces_msgs::msg::RigidBody>("optitrack/rigid_body_debug_" + std::to_string(r), 10));
+        rbOdomPubs.push_back(node->create_publisher<nav_msgs::msg::Odometry>("optitrack/odom", 10));
         seqs.push_back(0);
     }
     rclcpp::Rate loop_rate(360);
