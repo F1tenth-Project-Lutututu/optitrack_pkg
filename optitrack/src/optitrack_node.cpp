@@ -21,16 +21,15 @@
 #include "nav_msgs/msg/odometry.hpp"
 // // other
 #include "Mocap.hpp"
-#include "optitrack_msgs/msg/rigid_body.hpp"
-#include "optitrack_msgs/msg/marker.hpp"
+#include "optitrack_interfaces_msgs/msg/rigid_body.hpp"
+#include "optitrack_interfaces_msgs/msg/marker.hpp"
 
 
 
 int main(int argc, char *argv[]) {
     
     std::vector<rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr> rbPubs;
-    std::vector<rclcpp::Publisher<optitrack_msgs::msg::RigidBody>::SharedPtr> rbDebugPubs;
-
+    std::vector<rclcpp::Publisher<optitrack_interfaces_msgs::msg::RigidBody>::SharedPtr> rbDebugPubs;
     
     std::vector<rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr> rbOdomPubs;
 
@@ -44,8 +43,8 @@ int main(int argc, char *argv[]) {
 
     std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(node);
 
-    std::string localAddress = "192.168.2.175";
-    std::string serverAddress = "192.168.2.162";
+    std::string localAddress = "192.168.2.2";
+    std::string serverAddress = "192.168.2.34";
 
     // if(!node->get_parameter("local_address", localAddress)){
     //     RCLCPP_ERROR(node->get_logger(), "Could not read local_address from parameters");
@@ -64,15 +63,14 @@ int main(int argc, char *argv[]) {
 
     
     // vector<rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr> rbPubs;
-    // vector<rclcpp::Publisher<optitrack_msgs::msg::RigidBody>::SharedPtr> rbDebugPubs;
     std::vector<uint> seqs;
     for(int r = 0; r < nbodies; ++r) {
-        rbPubs.push_back(node->create_publisher<geometry_msgs::msg::PoseStamped>("rigid_body_" + std::to_string(r), 1000));
-        rbDebugPubs.push_back(node->create_publisher<optitrack_msgs::msg::RigidBody>("rigid_body_debug_" + std::to_string(r), 1000));
-        rbOdomPubs.push_back(node->create_publisher<nav_msgs::msg::Odometry>("odom", 1000));
+        rbPubs.push_back(node->create_publisher<geometry_msgs::msg::PoseStamped>("rigid_body_" + std::to_string(r), 10));
+        rbDebugPubs.push_back(node->create_publisher<optitrack_interfaces_msgs::msg::RigidBody>("rigid_body_debug_" + std::to_string(r), 10));
+        rbOdomPubs.push_back(node->create_publisher<nav_msgs::msg::Odometry>("odom", 10));
         seqs.push_back(0);
     }
-    rclcpp::Rate loop_rate(240);
+    rclcpp::Rate loop_rate(360);
     
     
     int count = 0;
@@ -159,7 +157,7 @@ int main(int argc, char *argv[]) {
 
 
             {
-                optitrack_msgs::msg::RigidBody rigidBody;
+                optitrack_interfaces_msgs::msg::RigidBody rigidBody;
                 rigidBody.header.frame_id = "optitrack";
                 rigidBody.header.stamp = curTimestamp;
                 // rigidBody.header.seq = seqs[r];
@@ -168,7 +166,7 @@ int main(int argc, char *argv[]) {
                 rigidBody.timestamp = curPose.timestamp;
                 rigidBody.mean_error = curPose.meanError;
                 for(const Marker &marker : curPose.markers){
-                    optitrack_msgs::msg::Marker markerRos;
+                    optitrack_interfaces_msgs::msg::Marker markerRos;
                     markerRos.location.x = marker.location(0);
                     markerRos.location.y = marker.location(1);
                     markerRos.location.z = marker.location(2);

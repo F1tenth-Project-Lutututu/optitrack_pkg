@@ -20,7 +20,7 @@ find_package(geometry_msgs REQUIRED)
 find_package(Boost REQUIRED COMPONENTS thread system program_options filesystem)
 find_package(Eigen3 3.3 REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
-find_package(optitrack_msgs REQUIRED)
+find_package(optitrack_interfaces_msgs REQUIRED)
 
 set(dependencies
   rclcpp
@@ -31,7 +31,7 @@ set(dependencies
   Boost
   Eigen3
   geometry_msgs
-  optitrack_msgs
+  optitrack_interfaces_msgs
 )
 
 rosidl_generate_interfaces(${PROJECT_NAME}_msgs
@@ -46,7 +46,7 @@ include_directories(include
   ${std_msgs_INCLUDE_DIRS}
   ${geometry_msgs_INCLUDE_DIRS}
   ${PROJECT_NAME}_msgs
-  ${optitrack_msgs}
+  ${optitrack_interfaces_msgs}
 )
 
 set(library_name ${PROJECT_NAME})
@@ -78,7 +78,6 @@ ament_export_dependencies(${dependencies})
 ament_package()
 
 
-
 # cmake_minimum_required(VERSION 3.5)
 # project(optitrack)
 
@@ -95,14 +94,14 @@ ament_package()
 # find_package(std_msgs REQUIRED)
 # find_package(geometry_msgs REQUIRED)
 # find_package(Boost REQUIRED COMPONENTS thread system program_options filesystem)
-# find_package(Eigen3 REQUIRED)
+# find_package(eigen3 REQUIRED)
 
 # ## Specify include directories
 # include_directories(
 #   include
 #   ${catkin_INCLUDE_DIRS}
 #   ${Boost_INCLUDE_DIRS}
-#   ${EIGEN3_INCLUDE_DIR}
+#   ${eigen3_INCLUDE_DIR}
 #   ${std_msgs_INCLUDE_DIRS}
 # )
 
