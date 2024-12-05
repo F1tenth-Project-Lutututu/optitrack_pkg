@@ -45,10 +45,22 @@ int main(int argc, char *argv[])
     std::string localAddress = "192.168.1.54";
     std::string serverAddress = "192.168.1.2";
 
-    // velocity filter
-    constexpr static std::array savgol_dev1_polynomial{-4.0f, -3.0f, -1.0f, 0.0f, 1.0f, 2.0f, 3.0f, 4.0f};
-    constexpr static float norm_factor = 60.0f;
-    etl::circular_buffer<std::array<float, 3>, savgol_dev1_polynomial.size()> pose_buffer;
+    // velocity filter window 9
+    constexpr static std::array savgol_1st_derivative_coef{-4.0f, -3.0f, -2.0f, -1.0f, 0.0f, 1.0f, 2.0f, 3.0f, 4.0f};
+    constexpr static float norm_factor_1st_derivative = 60.0f;
+
+    constexpr static std::array savgol_smoother_coef{-21.0, 14.0, 39.0, 54.0, 59.0, 54.0, 39.0, 14.0, -21.0};
+    constexpr static float norm_factor_smoother = 231.0f;
+
+    // velocity filter window 5
+    // constexpr static std::array savgol_1st_derivative_coef{-2.0f, -1.0f, 0.0f, 1.0f, 2.0f};
+    // constexpr static float norm_factor_1st_derivative = 10.0f;
+
+    // constexpr static std::array savgol_smoother_coef{-3.0, 12.0, 17.0, 12.0, -3.0};
+    // constexpr static float norm_factor_smoother = 35.0f;
+
+    constexpr static float dt = 1.0f / 240.0f;
+    etl::circular_buffer<std::array<float, 3>, savgol_1st_derivative_coef.size()> pose_buffer;
 
     // if(!node->get_parameter("local_address", localAddress)){
     //     RCLCPP_ERROR(node->get_logger(), "Could not read local_address from parameters");
@@ -58,9 +70,6 @@ int main(int argc, char *argv[])
     //     RCLCPP_ERROR(node->get_logger(), "Could not read server_address from parameters");
     //     rclcpp::shutdown();
     // }
-
-    geometry_msgs::msg::Point last_point;
-    geometry_msgs::msg::Quaternion last_rot;
 
     Mocap mocap(localAddress, serverAddress);
 
@@ -139,28 +148,51 @@ int main(int argc, char *argv[])
                 float vx = 0.0;
                 float vy = 0.0;
                 float yaw_rate = 0.0;
-                for (size_t i = 0; i < pose_buffer.size(); ++i)
+
+                float x = 0.0;
+                float y = 0.0;
+                float yaw = 0.0;
+
+                for (size_t i = 0; i < savgol_1st_derivative_coef.size(); ++i)
                 {
-                    vx += pose_buffer[i][0] * savgol_dev1_polynomial[i];
-                    vy += pose_buffer[i][1] * savgol_dev1_polynomial[i];
-                    yaw_rate += pose_buffer[i][2] * savgol_dev1_polynomial[i];
+                    vx += pose_buffer[i][0] * savgol_1st_derivative_coef[i];
+                    vy += pose_buffer[i][1] * savgol_1st_derivative_coef[i];
+                    yaw_rate += pose_buffer[i][2] * savgol_1st_derivative_coef[i];
+
+                    x += pose_buffer[i][0] * savgol_smoother_coef[i];
+                    y += pose_buffer[i][1] * savgol_smoother_coef[i];
+                    yaw += pose_buffer[i][2] * savgol_smoother_coef[i];
                 }
-                vx /= norm_factor;
-                vy /= norm_factor;
-                yaw_rate /= norm_factor;
 
-                // vx_b = vx_g * np.cos(yaw) + vy_g * np.sin(yaw)
-                // vy_b = -1.0 * vx_g * np.sin(yaw) + vy_g * np.cos(yaw)
+                vx /= norm_factor_1st_derivative * dt;
+                vy /= norm_factor_1st_derivative * dt;
+                yaw_rate /= norm_factor_1st_derivative * dt;
 
-                const float yaw = pose_buffer.back()[2]; // last yaw
+                x /= norm_factor_smoother;
+                y /= norm_factor_smoother;
+                yaw /= norm_factor_smoother;
+
+                // body frame
                 const float vx_b = vx * std::cos(yaw) + vy * std::sin(yaw);
                 const float vy_b = -1.0 * vx * std::sin(yaw) + vy * std::cos(yaw);
+
+                // quat from yaw
+                tf2::Quaternion quat_tf2;
+                quat_tf2.setRPY(0, 0, yaw);
+
+                geometry_msgs::msg::Quaternion quat;
+                quat.x = quat_tf2.getX();
+                quat.y = quat_tf2.getY();
+                quat.z = quat_tf2.getZ();
+                quat.w = quat_tf2.getW();
 
                 nav_msgs::msg::Odometry odom{};
                 odom.header.frame_id = "odom_2";
                 odom.header.stamp = curTimestamp;
                 odom.child_frame_id = "base_link";
-                odom.pose.pose.position = point;
+                odom.pose.pose.position.x = x;
+                odom.pose.pose.position.y = y;
+
                 odom.pose.pose.orientation = quat;
                 odom.twist.twist.linear.x = vx_b;
                 odom.twist.twist.linear.y = vy_b;
