@@ -22,6 +22,16 @@ find_package(Eigen3 3.3 REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(optitrack_interfaces_msgs REQUIRED)
 
+
+Include(FetchContent)
+
+FetchContent_Declare(
+  etl
+  GIT_REPOSITORY https://github.com/ETLCPP/etl
+  GIT_TAG        20.38.1
+)
+FetchContent_MakeAvailable(etl)
+
 set(dependencies
   rclcpp
   std_msgs
@@ -55,10 +65,9 @@ ament_target_dependencies(${library_name} ${dependencies})
 
 
 add_executable(publisher_main src/optitrack_node.cpp)
-target_link_libraries(publisher_main ${library_name})
+target_link_libraries(publisher_main ${library_name} etl::etl)
 
 ament_target_dependencies(publisher_main ${dependencies})
-
 
 
 install(TARGETS publisher_main ${library_name}
