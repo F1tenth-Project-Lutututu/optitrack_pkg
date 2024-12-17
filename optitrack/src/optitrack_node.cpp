@@ -26,6 +26,18 @@
 // derivative calc
 #include "etl/circular_buffer.h"
 
+
+float unwrap(float previous_angle, float new_angle) {
+    float d = new_angle - previous_angle;
+    if (d > M_PI) {
+        return new_angle - 2 * M_PI;
+    } else if (d < -M_PI) {
+        return new_angle + 2 * M_PI;
+    } 
+    return new_angle;
+}
+
+
 int main(int argc, char *argv[])
 {
 
@@ -109,13 +121,9 @@ int main(int argc, char *argv[])
 
             tf2::Quaternion q_tf2{quat.x, quat.y, quat.z, quat.w};
             // Ensure that yaw angles are continuous
-            tf2::Quaternion lastq_tf2_inv = last_q_tf2.inverse();
-            tf2::Quaternion q_tf2_diff = q_tf2 * lastq_tf2_inv;
-            float yaw_diff = tf2::impl::getYaw(q_tf2_diff);
-            float yaw = tf2::impl::getYaw(last_q_tf2) + yaw_diff;
+            float unwrapped_yaw = unwrap(tf2::impl::getYaw(last_q_tf2), tf2::impl::getYaw(q_tf2));
             last_q_tf2 = q_tf2;
-
-            std::array<float, 3> pose{(float)point.x, (float)point.y, yaw};
+            std::array<float, 3> pose{(float)point.x, (float)point.y, unwrapped_yaw};
             //std::array<float, 3> pose{(float)point.x, (float)point.y, (float)tf2::impl::getYaw(q_tf2)};
             pose_buffer.push(pose);
 
