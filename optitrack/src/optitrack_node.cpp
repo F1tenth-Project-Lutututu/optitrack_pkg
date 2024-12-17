@@ -90,6 +90,8 @@ int main(int argc, char *argv[])
         vectorPose poses = mocap.getLatestPoses();
         rclcpp::Time curTimestamp = node->now();
 
+
+        tf2::Quaternion last_q_tf2{poses[0].r.x(), poses[0].r.y(), poses[0].r.z(), poses[0].r.w()};
         for (const Pose &curPose : poses)
         {
             int r = curPose.id - 1;
@@ -106,7 +108,15 @@ int main(int argc, char *argv[])
             quat.w = curPose.r.w();
 
             tf2::Quaternion q_tf2{quat.x, quat.y, quat.z, quat.w};
-            std::array<float, 3> pose{(float)point.x, (float)point.y, (float)tf2::impl::getYaw(q_tf2)};
+            // Ensure that yaw angles are continuous
+            tf2::Quaternion lastq_tf2_inv = last_q_tf2.inverse();
+            tf2::Quaternion q_tf2_diff = q_tf2 * lastq_tf2_inv;
+            float yaw_diff = tf2::impl::getYaw(q_tf2_diff);
+            float yaw = tf2::impl::getYaw(last_q_tf2) + yaw_diff;
+            last_q_tf2 = q_tf2;
+
+            std::array<float, 3> pose{(float)point.x, (float)point.y, yaw};
+            //std::array<float, 3> pose{(float)point.x, (float)point.y, (float)tf2::impl::getYaw(q_tf2)};
             pose_buffer.push(pose);
 
             {
@@ -119,11 +129,10 @@ int main(int argc, char *argv[])
             }
 
             {
-                tf2::Quaternion q{quat.x, quat.y, quat.z, quat.w};
                 // quaternion with 90 deg in yaw
                 tf2::Quaternion t;
                 t.setRPY(0, 0, 0);
-                t = t * q;
+                t = t * q_tf2;
 
                 geometry_msgs::msg::Quaternion to_send;
                 to_send.x = t.getX();
