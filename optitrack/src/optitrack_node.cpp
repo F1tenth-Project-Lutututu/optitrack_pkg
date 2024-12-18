@@ -102,8 +102,6 @@ int main(int argc, char *argv[])
         vectorPose poses = mocap.getLatestPoses();
         rclcpp::Time curTimestamp = node->now();
 
-
-        tf2::Quaternion last_q_tf2{poses[0].r.x(), poses[0].r.y(), poses[0].r.z(), poses[0].r.w()};
         for (const Pose &curPose : poses)
         {
             int r = curPose.id - 1;
@@ -120,11 +118,8 @@ int main(int argc, char *argv[])
             quat.w = curPose.r.w();
 
             tf2::Quaternion q_tf2{quat.x, quat.y, quat.z, quat.w};
-            // Ensure that yaw angles are continuous
-            float unwrapped_yaw = unwrap(tf2::impl::getYaw(last_q_tf2), tf2::impl::getYaw(q_tf2));
-            last_q_tf2 = q_tf2;
-            std::array<float, 3> pose{(float)point.x, (float)point.y, unwrapped_yaw};
-            //std::array<float, 3> pose{(float)point.x, (float)point.y, (float)tf2::impl::getYaw(q_tf2)};
+            std::array<float, 3> pose{(float)point.x, (float)point.y, (float)tf2::impl::getYaw(q_tf2)};
+
             pose_buffer.push(pose);
 
             {
@@ -170,15 +165,19 @@ int main(int argc, char *argv[])
                 float y = 0.0;
                 float yaw = 0.0;
 
+                float last_yaw = pose_buffer[0][2];
                 for (size_t i = 0; i < savgol_1st_derivative_coef.size(); ++i)
                 {
+                    // unwrap angles to make them coninous among the buffer
+                    float unwrapped_yaw = unwrap(last_yaw, pose_buffer[i][2]);
                     vx += pose_buffer[i][0] * savgol_1st_derivative_coef[i];
                     vy += pose_buffer[i][1] * savgol_1st_derivative_coef[i];
-                    yaw_rate += pose_buffer[i][2] * savgol_1st_derivative_coef[i];
+                    yaw_rate += unwrapped_yaw * savgol_1st_derivative_coef[i];
 
                     x += pose_buffer[i][0] * savgol_smoother_coef[i];
                     y += pose_buffer[i][1] * savgol_smoother_coef[i];
-                    yaw += pose_buffer[i][2] * savgol_smoother_coef[i];
+                    yaw += unwrapped_yaw * savgol_smoother_coef[i];
+                    last_yaw = unwrapped_yaw;
                 }
 
                 vx /= norm_factor_1st_derivative * dt;
