@@ -188,6 +188,9 @@ int main(int argc, char *argv[])
                 y /= norm_factor_smoother;
                 yaw /= norm_factor_smoother;
 
+                // wrap yaw
+                yaw = std::atan2(std::sin(yaw), std::cos(yaw));
+
                 // body frame
                 const float vx_b = vx * std::cos(yaw) + vy * std::sin(yaw);
                 const float vy_b = -1.0 * vx * std::sin(yaw) + vy * std::cos(yaw);
