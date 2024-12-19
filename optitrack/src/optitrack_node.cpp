@@ -26,6 +26,18 @@
 // derivative calc
 #include "etl/circular_buffer.h"
 
+
+float unwrap(float previous_angle, float new_angle) {
+    float d = new_angle - previous_angle;
+    if (d > M_PI) {
+        return new_angle - 2 * M_PI;
+    } else if (d < -M_PI) {
+        return new_angle + 2 * M_PI;
+    } 
+    return new_angle;
+}
+
+
 int main(int argc, char *argv[])
 {
 
@@ -107,6 +119,7 @@ int main(int argc, char *argv[])
 
             tf2::Quaternion q_tf2{quat.x, quat.y, quat.z, quat.w};
             std::array<float, 3> pose{(float)point.x, (float)point.y, (float)tf2::impl::getYaw(q_tf2)};
+
             pose_buffer.push(pose);
 
             {
@@ -119,11 +132,10 @@ int main(int argc, char *argv[])
             }
 
             {
-                tf2::Quaternion q{quat.x, quat.y, quat.z, quat.w};
                 // quaternion with 90 deg in yaw
                 tf2::Quaternion t;
                 t.setRPY(0, 0, 0);
-                t = t * q;
+                t = t * q_tf2;
 
                 geometry_msgs::msg::Quaternion to_send;
                 to_send.x = t.getX();
@@ -153,15 +165,19 @@ int main(int argc, char *argv[])
                 float y = 0.0;
                 float yaw = 0.0;
 
+                float last_yaw = pose_buffer[0][2];
                 for (size_t i = 0; i < savgol_1st_derivative_coef.size(); ++i)
                 {
+                    // unwrap angles to make them coninous among the buffer
+                    float unwrapped_yaw = unwrap(last_yaw, pose_buffer[i][2]);
                     vx += pose_buffer[i][0] * savgol_1st_derivative_coef[i];
                     vy += pose_buffer[i][1] * savgol_1st_derivative_coef[i];
-                    yaw_rate += pose_buffer[i][2] * savgol_1st_derivative_coef[i];
+                    yaw_rate += unwrapped_yaw * savgol_1st_derivative_coef[i];
 
                     x += pose_buffer[i][0] * savgol_smoother_coef[i];
                     y += pose_buffer[i][1] * savgol_smoother_coef[i];
-                    yaw += pose_buffer[i][2] * savgol_smoother_coef[i];
+                    yaw += unwrapped_yaw * savgol_smoother_coef[i];
+                    last_yaw = unwrapped_yaw;
                 }
 
                 vx /= norm_factor_1st_derivative * dt;
@@ -171,6 +187,9 @@ int main(int argc, char *argv[])
                 x /= norm_factor_smoother;
                 y /= norm_factor_smoother;
                 yaw /= norm_factor_smoother;
+
+                // wrap yaw
+                yaw = std::atan2(std::sin(yaw), std::cos(yaw));
 
                 // body frame
                 const float vx_b = vx * std::cos(yaw) + vy * std::sin(yaw);
