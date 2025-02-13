@@ -181,8 +181,9 @@ void Mocap::init() {
     commandListener->start();
     
     bool natNetVersionReveived = false;
+    int trials = 0;
     while(!natNetVersionReveived) {
-        cout << "Sending ping to receive NetNet version" << endl;
+        cout << "Sending ping to receive NatNet version" << endl;
         
         // Send a ping packet to the server so that it sends us the NatNet version
         // in its response to commandListener.
@@ -202,6 +203,8 @@ void Mocap::init() {
             
             ++cnt;
         }
+        ++trials;
+        if (trials > 50) return;
         
     }
     
