@@ -72,7 +72,7 @@ int main(int argc, char *argv[])
     // constexpr static float norm_factor_smoother = 35.0f;
 
     constexpr static float dt = 1.0f / 240.0f;
-    etl::circular_buffer<std::array<float, 3>, savgol_1st_derivative_coef.size()> pose_buffer;
+    etl::circular_buffer<std::array<float, 6>, savgol_1st_derivative_coef.size()> pose_buffer;
 
     // if(!node->get_parameter("local_address", localAddress)){
     //     RCLCPP_ERROR(node->get_logger(), "Could not read local_address from parameters");
@@ -118,7 +118,10 @@ int main(int argc, char *argv[])
             quat.w = curPose.r.w();
 
             tf2::Quaternion q_tf2{quat.x, quat.y, quat.z, quat.w};
-            std::array<float, 3> pose{(float)point.x, (float)point.y, (float)tf2::impl::getYaw(q_tf2)};
+            double roll, pitch, yaw;
+            tf2::impl::getEulerYPR(q_tf2, yaw, pitch, roll);
+            std::array<float, 6> pose{(float)point.x, (float)point.y, (float)point.z,
+                                      (float)roll, (float)pitch, (float)yaw};
 
             pose_buffer.push(pose);
 
@@ -159,45 +162,67 @@ int main(int argc, char *argv[])
                 // iterator based for loop
                 float vx = 0.0;
                 float vy = 0.0;
+                float vz = 0.0;
+                float roll_rate = 0.0;
+                float pitch_rate = 0.0;
                 float yaw_rate = 0.0;
 
                 float x = 0.0;
                 float y = 0.0;
+                float z = 0.0;
+                float roll = 0.0;
+                float pitch = 0.0;
                 float yaw = 0.0;
 
-                float last_yaw = pose_buffer[0][2];
+                float last_roll = pose_buffer[0][3];
+                float last_pitch = pose_buffer[0][4];
+                float last_yaw = pose_buffer[0][5];
                 for (size_t i = 0; i < savgol_1st_derivative_coef.size(); ++i)
                 {
                     // unwrap angles to make them coninous among the buffer
-                    float unwrapped_yaw = unwrap(last_yaw, pose_buffer[i][2]);
+                    float unwrapped_roll = unwrap(last_roll, pose_buffer[i][3]);
+                    float unwrapped_pitch = unwrap(last_pitch, pose_buffer[i][4]);
+                    float unwrapped_yaw = unwrap(last_yaw, pose_buffer[i][5]);
                     vx += pose_buffer[i][0] * savgol_1st_derivative_coef[i];
                     vy += pose_buffer[i][1] * savgol_1st_derivative_coef[i];
+                    vz += pose_buffer[i][2] * savgol_1st_derivative_coef[i];
+                    roll_rate += unwrapped_roll * savgol_1st_derivative_coef[i];
+                    pitch_rate += unwrapped_pitch * savgol_1st_derivative_coef[i];
                     yaw_rate += unwrapped_yaw * savgol_1st_derivative_coef[i];
 
                     x += pose_buffer[i][0] * savgol_smoother_coef[i];
                     y += pose_buffer[i][1] * savgol_smoother_coef[i];
+                    z += pose_buffer[i][2] * savgol_smoother_coef[i];
+                    roll += unwrapped_roll * savgol_smoother_coef[i];
+                    pitch += unwrapped_pitch * savgol_smoother_coef[i];
                     yaw += unwrapped_yaw * savgol_smoother_coef[i];
+                    last_roll = unwrapped_roll;
+                    last_pitch = unwrapped_pitch;
                     last_yaw = unwrapped_yaw;
                 }
 
                 vx /= norm_factor_1st_derivative * dt;
                 vy /= norm_factor_1st_derivative * dt;
+                vz /= norm_factor_1st_derivative * dt;
+                roll_rate /= norm_factor_1st_derivative * dt;
+                pitch_rate /= norm_factor_1st_derivative * dt;
                 yaw_rate /= norm_factor_1st_derivative * dt;
 
                 x /= norm_factor_smoother;
                 y /= norm_factor_smoother;
+                z /= norm_factor_smoother;
+                roll /= norm_factor_smoother;
+                pitch /= norm_factor_smoother;
                 yaw /= norm_factor_smoother;
 
                 // wrap yaw
+                roll = std::atan2(std::sin(roll), std::cos(roll));
+                pitch = std::atan2(std::sin(pitch), std::cos(pitch));
                 yaw = std::atan2(std::sin(yaw), std::cos(yaw));
-
-                // body frame
-                const float vx_b = vx * std::cos(yaw) + vy * std::sin(yaw);
-                const float vy_b = -1.0 * vx * std::sin(yaw) + vy * std::cos(yaw);
 
                 // quat from yaw
                 tf2::Quaternion quat_tf2;
-                quat_tf2.setRPY(0, 0, yaw);
+                quat_tf2.setRPY(roll, pitch, yaw);
 
                 geometry_msgs::msg::Quaternion quat;
                 quat.x = quat_tf2.getX();
@@ -211,16 +236,19 @@ int main(int argc, char *argv[])
                 odom.child_frame_id = "base_link";
                 odom.pose.pose.position.x = x;
                 odom.pose.pose.position.y = y;
+                odom.pose.pose.position.z = z;
 
                 odom.pose.pose.orientation = quat;
-                odom.twist.twist.linear.x = vx_b;
-                odom.twist.twist.linear.y = vy_b;
-                odom.twist.twist.linear.z = 0.0;
+                odom.twist.twist.linear.x = vx;
+                odom.twist.twist.linear.y = vy;
+                odom.twist.twist.linear.z = vz;
 
                 odom.pose.covariance[0] = 0.1;  ///< x
                 odom.pose.covariance[7] = 0.1;  ///< y
                 odom.pose.covariance[35] = 0.2; ///< yaw
 
+                odom.twist.twist.angular.x = roll_rate;
+                odom.twist.twist.angular.y = pitch_rate;
                 odom.twist.twist.angular.z = yaw_rate;
 
                 rbOdomPubs[r]->publish(odom);
