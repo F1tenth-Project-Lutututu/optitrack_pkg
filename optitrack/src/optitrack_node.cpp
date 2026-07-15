@@ -91,9 +91,9 @@ int main(int argc, char *argv[])
     std::vector<uint> seqs;
     for (int r = 0; r < nbodies; ++r)
     {
-        rbPubs.push_back(node->create_publisher<geometry_msgs::msg::PoseStamped>("optitrack/rigid_body_" + std::to_string(r), 10));
-        rbDebugPubs.push_back(node->create_publisher<optitrack_interfaces_msgs::msg::RigidBody>("optitrack/rigid_body_debug_" + std::to_string(r), 10));
-        rbOdomPubs.push_back(node->create_publisher<nav_msgs::msg::Odometry>("optitrack/odom", 10));
+        rbPubs.push_back(node->create_publisher<geometry_msgs::msg::PoseStamped>("optitrack/rigid_body_" + std::to_string(r), rclcpp::SensorDataQoS()));
+        rbDebugPubs.push_back(node->create_publisher<optitrack_interfaces_msgs::msg::RigidBody>("optitrack/rigid_body_debug_" + std::to_string(r), rclcpp::SensorDataQoS()));
+        rbOdomPubs.push_back(node->create_publisher<nav_msgs::msg::Odometry>("optitrack/odom", rclcpp::SensorDataQoS()));
         seqs.push_back(0);
     }
     // rclcpp::Rate loop_rate(1000);
@@ -120,7 +120,7 @@ int main(int argc, char *argv[])
             quat.w = curPose.r.w();
 
             tf2::Quaternion q_tf2{quat.x, quat.y, quat.z, quat.w};
-            std::array<float, 3> pose{(float)point.x, (float)point.y, (float)tf2::impl::getYaw(q_tf2)};
+            std::array<float, 3> pose{(float)point.x, (float)point.y, (float)tf2::impl::getYaw(q_tf2) + 0.0f};
 
             pose_buffer.push(pose);
 
@@ -207,9 +207,16 @@ int main(int argc, char *argv[])
                 quat.z = quat_tf2.getZ();
                 quat.w = quat_tf2.getW();
 
+                // The Savitzky-Golay filter is centred (symmetric coefficients),
+                // so the group delay equals half the window minus one sample.
+                constexpr double filter_delay_s =
+                    static_cast<double>(savgol_1st_derivative_coef.size() - 1) / 2.0 * dt;
+                const rclcpp::Time stampCorrected =
+                    curTimestamp - rclcpp::Duration::from_seconds(filter_delay_s);
+
                 nav_msgs::msg::Odometry odom{};
                 odom.header.frame_id = "odom_2";
-                odom.header.stamp = curTimestamp;
+                odom.header.stamp = stampCorrected;
                 odom.child_frame_id = "base_link";
                 odom.pose.pose.position.x = x;
                 odom.pose.pose.position.y = y;
