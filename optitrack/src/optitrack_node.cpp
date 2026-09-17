@@ -26,17 +26,19 @@
 // derivative calc
 #include "etl/circular_buffer.h"
 
-
-float unwrap(float previous_angle, float new_angle) {
+float unwrap(float previous_angle, float new_angle)
+{
     float d = new_angle - previous_angle;
-    if (d > M_PI) {
+    if (d > M_PI)
+    {
         return new_angle - 2 * M_PI;
-    } else if (d < -M_PI) {
+    }
+    else if (d < -M_PI)
+    {
         return new_angle + 2 * M_PI;
-    } 
+    }
     return new_angle;
 }
-
 
 int main(int argc, char *argv[])
 {
@@ -95,7 +97,7 @@ int main(int argc, char *argv[])
         rbOdomPubs.push_back(node->create_publisher<nav_msgs::msg::Odometry>("optitrack/odom", 10));
         seqs.push_back(0);
     }
-    rclcpp::Rate loop_rate(360);
+    // rclcpp::Rate loop_rate(1000);
 
     int count = 0;
     while (rclcpp::ok())
@@ -282,7 +284,7 @@ int main(int argc, char *argv[])
             ++seqs[r];
         }
         rclcpp::spin_some(node);
-        loop_rate.sleep();
-        ++count;
+        // loop_rate.sleep();
+        // ++count;
     }
 }
