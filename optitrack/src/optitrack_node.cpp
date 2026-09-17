@@ -55,7 +55,8 @@ int main(int argc, char *argv[])
     std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(node);
 
     std::string localAddress = "192.168.1.54";
-    std::string serverAddress = "192.168.1.2";
+    std::string serverAddress = "192.168.1.3";
+    //std::string serverAddress = "192.168.1.2";
 
     // velocity filter window 9
     constexpr static std::array savgol_1st_derivative_coef{-4.0f, -3.0f, -2.0f, -1.0f, 0.0f, 1.0f, 2.0f, 3.0f, 4.0f};
@@ -132,29 +133,6 @@ int main(int argc, char *argv[])
                 poseStamped.pose.position = point;
                 poseStamped.pose.orientation = quat;
                 rbPubs[r]->publish(poseStamped);
-            }
-
-            {
-                // quaternion with 90 deg in yaw
-                tf2::Quaternion t;
-                t.setRPY(0, 0, 0);
-                t = t * q_tf2;
-
-                geometry_msgs::msg::Quaternion to_send;
-                to_send.x = t.getX();
-                to_send.y = t.getY();
-                to_send.z = t.getZ();
-                to_send.w = t.getW();
-
-                geometry_msgs::msg::TransformStamped transformStamped;
-                transformStamped.header.frame_id = "odom_2";
-                transformStamped.header.stamp = curTimestamp;
-                transformStamped.child_frame_id = "base_link";
-                transformStamped.transform.translation.x = point.x;
-                transformStamped.transform.translation.y = point.y;
-                transformStamped.transform.translation.z = point.z;
-                transformStamped.transform.rotation = to_send;
-                // tf_broadcaster_->sendTransform(transformStamped);
             }
 
             { // Odometry
@@ -252,6 +230,30 @@ int main(int argc, char *argv[])
                 odom.twist.twist.angular.z = yaw_rate;
 
                 rbOdomPubs[r]->publish(odom);
+
+                // quaternion with 90 deg in yaw
+                tf2::Quaternion t;
+                //t.setRPY(0, -M_PI/2, 0);
+                t.setRPY(0, 0, 0);
+                t = t * quat_tf2;
+
+                geometry_msgs::msg::Quaternion to_send;
+                to_send.x = t.getX();
+                to_send.y = t.getY();
+                to_send.z = t.getZ();
+                to_send.w = t.getW();
+
+                geometry_msgs::msg::TransformStamped transformStamped;
+                transformStamped.header.frame_id = "world";
+                transformStamped.header.stamp = curTimestamp;
+                //transformStamped.child_frame_id = "hb40/base_link";
+                transformStamped.child_frame_id = "base_link_gt";
+                transformStamped.transform.translation.x = point.x;
+                transformStamped.transform.translation.y = point.y;
+                transformStamped.transform.translation.z = point.z;
+                transformStamped.transform.rotation = to_send;
+                //transformStamped.transform.rotation = quat;
+                tf_broadcaster_->sendTransform(transformStamped);
             }
 
             {
